@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge · StoriaForge</title>
+<meta name="description" content="A estrutura que sustenta o sonho. Face operacional do StoriaForge.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #1a1410;
+  --parchment: #f5f0e8;
+  --cream: #ede8dc;
+  --cream-dim: rgba(237,232,220,0.65);
+  --cream-faint: rgba(237,232,220,0.12);
+  --muted: #7a6f60;
+  --gold: #b08830;
+  --gold-dim: #8a6a28;
+  --gold-pale: #e8d49a;
+  --gold-glow: rgba(176,136,48,0.15);
+  --gold-border: rgba(176,136,48,0.28);
+  --gold-border-strong: rgba(176,136,48,0.55);
+  --sea: #2a4a5e;
+  --sea-dark: #16303f;
+  --sea-mid: #1e3d4f;
+  --sea-deep: #0f2535;
+  --forge-navy: #0f2240;
+  --forge-blue: #7aa3c8;
+}
+*{ margin:0; padding:0; box-sizing:border-box }
+html{ scroll-behavior:smooth }
+body{
+  font-family:'EB Garamond', Georgia, serif;
+  background: var(--forge-navy);
+  color: var(--cream);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:0; opacity:0.6;
+}
+
+.container {
+  position: relative; z-index:1;
+  max-width: 680px; width:100%;
+  padding: 80px 32px;
+  display: flex; flex-direction: column;
+  align-items: center; text-align: center;
+}
+
+/* Header */
+.eyebrow {
+  font-family:'Cormorant Garamond', serif;
+  font-size:0.72rem; letter-spacing:0.5em; text-transform:uppercase;
+  color: var(--gold); opacity:0.8;
+  margin-bottom: 32px;
+}
+.title {
+  font-family:'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 7vw, 5rem);
+  font-weight:600; letter-spacing:0.12em;
+  color: var(--forge-blue);
+  line-height:1;
+  margin-bottom: 12px;
+}
+.subtitle {
+  font-family:'Cormorant Garamond', serif;
+  font-style:italic; font-size:1.15rem;
+  color: var(--cream-dim);
+  margin-bottom: 48px;
+}
+.rule {
+  width:60px; height:1px;
+  background: var(--forge-blue); opacity:0.4;
+  margin-bottom: 48px;
+}
+
+/* Cards */
+.cards {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 2px; width:100%;
+  margin-bottom: 64px;
+}
+.card {
+  padding: 40px 32px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--gold-border);
+  text-decoration: none; color: inherit;
+  display: flex; flex-direction: column;
+  align-items: center; text-align: center;
+  transition: background 0.4s, border-color 0.4s;
+  position: relative; overflow: hidden;
+}
+.card:hover {
+  background: rgba(122,163,200,0.06);
+  border-color: var(--gold-border-strong);
+}
+.card::before {
+  content:'';
+  position:absolute; left:0; top:0; bottom:0; width:3px;
+  background: var(--forge-blue); transform:scaleY(0); transform-origin:bottom;
+  transition: transform 0.4s ease;
+}
+.card:hover::before { transform:scaleY(1); }
+.card-icon {
+  font-size: 2rem; margin-bottom: 16px;
+  color: var(--forge-blue); opacity:0.7;
+}
+.card-title {
+  font-family:'Cormorant Garamond', serif;
+  font-size: 1.4rem; font-weight:600;
+  letter-spacing: 0.08em;
+  color: var(--forge-blue);
+  margin-bottom: 8px;
+}
+.card-desc {
+  font-family:'EB Garamond', serif;
+  font-size: 0.9rem; line-height:1.6;
+  color: var(--cream-dim);
+  margin-bottom: 20px;
+}
+.card-action {
+  font-family:'Cormorant Garamond', serif;
+  font-size:0.78rem; letter-spacing:0.2em; text-transform:uppercase;
+  color: var(--gold);
+  transition: gap 0.3s;
+  display: inline-flex; align-items:center; gap:8px;
+}
+.card:hover .card-action { gap:12px; }
+
+/* Footer */
+.footer {
+  font-family:'EB Garamond', serif;
+  font-size: 0.78rem; letter-spacing:0.15em;
+  color: var(--muted); text-align:center;
+}
+.footer-anchor {
+  display:block; margin-bottom:12px;
+  font-family:'Cormorant Garamond', serif;
+  font-size:1.4rem; color: var(--gold); opacity:0.5;
+}
+.footer a {
+  color: var(--muted); text-decoration:none;
+  transition: color 0.3s;
+}
+.footer a:hover { color: var(--gold); }
+
+@media(max-width:560px){
+  .cards { grid-template-columns:1fr; }
+  .container { padding: 60px 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <p class="eyebrow">StoriaForge · Uso Interno</p>
+  <h1 class="title">Forge</h1>
+  <p class="subtitle">A estrutura que sustenta o sonho</p>
+  <div class="rule"></div>
+
+  <div class="cards">
+    <a href="/sfbs/" class="card">
+      <span class="card-icon">⚙</span>
+      <h2 class="card-title">SFBS</h2>
+      <p class="card-desc">Onboarding de novos autores</p>
+      <span class="card-action">Acessar <span>→</span></span>
+    </a>
+    <a href="https://admin.storiaforge.com" class="card">
+      <span class="card-icon">⚓</span>
+      <h2 class="card-title">Admin</h2>
+      <p class="card-desc">Painel administrativo</p>
+      <span class="card-action">Acessar <span>→</span></span>
+    </a>
+  </div>
+
+  <div class="footer">
+    <span class="footer-anchor">⚓</span>
+    <a href="https://storiaforge.com">StoriaForge</a> · Uso Interno
+  </div>
+</div>
+
+</body>
+</html>
