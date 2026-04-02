@@ -409,6 +409,19 @@ body::before{content:'';position:fixed;inset:0;
         <span class="rc-icon">🧠</span>
         <div class="rc-title">Diagnóstico SFBS</div>
         <div class="rc-status pending" id="diag-status">Aguardando…</div>
+        <button class="rc-action" id="dl-diag" onclick="downloadReport('diag')" style="display:none;">Baixar Diagnóstico →</button>
+      </div>
+      <div class="result-card rc-gold">
+        <span class="rc-icon">📖</span>
+        <div class="rc-title">Análise Editorial</div>
+        <div class="rc-status pending" id="editorial-status">Aguardando…</div>
+        <button class="rc-action" id="dl-editorial" onclick="downloadReport('editorial')" style="display:none;">Baixar Análise →</button>
+      </div>
+      <div class="result-card rc-ice">
+        <span class="rc-icon">🌍</span>
+        <div class="rc-title">Consistência do Worldbuilding</div>
+        <div class="rc-status pending" id="world-status">Aguardando…</div>
+        <button class="rc-action" id="dl-world" onclick="downloadReport('world')" style="display:none;">Baixar Análise →</button>
       </div>
     </div>
 
@@ -422,6 +435,26 @@ body::before{content:'';position:fixed;inset:0;
       <div class="report-body" id="report-body" style="display:none;"></div>
       <div class="frutos-grid" id="frutos-grid"></div>
     </div>
+
+    <!-- ANÁLISE EDITORIAL -->
+    <div class="report-card" id="editorial-card" style="display:none;">
+      <div class="report-title" id="editorial-title">Análise Editorial</div>
+      <div class="thinking" id="editorial-thinking">
+        <div class="thinking-dots"><span></span><span></span><span></span></div>
+        Analisando a obra como produto editorial
+      </div>
+      <div class="report-body" id="editorial-body" style="display:none;"></div>
+    </div>
+
+    <!-- CONSISTÊNCIA DO WORLDBUILDING -->
+    <div class="report-card" id="world-card" style="display:none;">
+      <div class="report-title" id="world-title">Consistência do Worldbuilding</div>
+      <div class="thinking" id="world-thinking">
+        <div class="thinking-dots"><span></span><span></span><span></span></div>
+        Mapeando coerência entre as dimensões do universo
+      </div>
+      <div class="report-body" id="world-body" style="display:none;"></div>
+    </div>
   </div>
 
 </div><!-- shell -->
@@ -434,6 +467,20 @@ const GH_BRANCH = 'main';
 
 let uploadedFiles = [];
 let generatedEmailHtml = '';
+const reports = { diag: '', editorial: '', world: '' };
+
+function downloadReport(type) {
+  const names = { diag: 'Diagnostico-SFBS', editorial: 'Analise-Editorial', world: 'Consistencia-Worldbuilding' };
+  const content = reports[type];
+  if (!content) return;
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${names[type]}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ── STEPS ──────────────────────────────────────────────
 function updateSteps() {
@@ -1005,18 +1052,135 @@ Tom: caloroso, preciso, entusiasmado com este projeto específico.`;
       document.getElementById('report-title').textContent=`Diagnóstico SFBS · ${projName}`;
       const rb=document.getElementById('report-body'); rb.style.display='block'; rb.textContent=report;
       renderFrutos(parseFrutos(report));
+      reports.diag = report;
 
       document.getElementById('diag-status').textContent='✓ Gerado';
       document.getElementById('diag-status').className='rc-status';
+      document.getElementById('dl-diag').style.display='inline-flex';
 
       // Salvar diagnóstico no repo
       await uploadHtml(report, 'diagnostico-sfbs.txt', slug, 'SFBS: diagnóstico inicial');
       log('✓ Diagnóstico gerado e salvo', 'ok');
     } catch(e) { log(`✗ Diagnóstico: ${e.message}`, 'err'); }
 
+    setProgress(75);
+
+    // ── STEP 6: Análise Editorial ──────────────────────
+    log('⑥ Gerando análise editorial…', 'info');
+    document.getElementById('editorial-card').style.display='block';
+
+    try {
+      const editorialPrompt = `Você é um analista editorial sênior do StoryForge Building System. Analise o material abaixo como um produto editorial, avaliando em profundidade para o público-alvo identificado.
+
+${diagSummary}
+
+Produza uma ANÁLISE EDITORIAL completa cobrindo:
+
+## 1. ESTRUTURA NARRATIVA
+Avalie arco narrativo, estrutura de atos, ritmo, tensão e resolução. Identifique se há arcos paralelos e como se conectam.
+
+## 2. DESENVOLVIMENTO DE PERSONAGENS
+Profundidade psicológica, arcos de transformação, consistência de voz, motivações e conflitos internos de cada personagem relevante.
+
+## 3. VOZ E TOM
+Análise do estilo autoral: registro, vocabulário, cadência, uso de diálogo vs narração, presença ou ausência de voz autoral distinta.
+
+## 4. WORLDBUILDING COMO SERVIÇO À NARRATIVA
+O universo serve a história ou a sobrecarrega? Exposição é orgânica ou forçada? O leitor é imerso ou instruído?
+
+## 5. ADEQUAÇÃO AO PÚBLICO-ALVO
+Considerando o gênero e contexto do autor: a obra atende às expectativas do público? Onde supera? Onde pode frustrar?
+
+## 6. PONTOS FORTES
+O que já funciona muito bem e deve ser preservado e amplificado.
+
+## 7. GAPS EDITORIAIS
+O que precisa de atenção: furos de lógica, inconsistências, cenas que não funcionam, transições abruptas.
+
+## 8. RECOMENDAÇÕES CONCRETAS
+Lista priorizada de ações editoriais — do mais urgente ao refinamento final. Cada recomendação deve ser específica e acionável.
+
+Tom: profissional, respeitoso, construtivo. Seja honesto sem ser destrutivo.`;
+
+      const editorialReport = await callClaude(editorialPrompt, claudeKey, 3500);
+      document.getElementById('editorial-thinking').style.display='none';
+      document.getElementById('editorial-title').textContent=`Análise Editorial · ${projName}`;
+      const eb=document.getElementById('editorial-body'); eb.style.display='block'; eb.textContent=editorialReport;
+      reports.editorial = editorialReport;
+
+      document.getElementById('editorial-status').textContent='✓ Gerado';
+      document.getElementById('editorial-status').className='rc-status';
+      document.getElementById('dl-editorial').style.display='inline-flex';
+
+      await uploadHtml(editorialReport, 'analise-editorial.txt', slug, 'SFBS: análise editorial');
+      log('✓ Análise editorial gerada e salva', 'ok');
+    } catch(e) { log(`✗ Análise editorial: ${e.message}`, 'err'); }
+
+    setProgress(88);
+
+    // ── STEP 7: Consistência do Worldbuilding ──────────
+    log('⑦ Analisando consistência do worldbuilding…', 'info');
+    document.getElementById('world-card').style.display='block';
+
+    try {
+      const worldPrompt = `Você é um arquiteto de universos ficcionais do StoryForge Building System. Analise o material abaixo focando exclusivamente na CONSISTÊNCIA INTERNA do worldbuilding — as dimensões do universo e como se sustentam entre si.
+
+${diagSummary}
+
+Produza uma análise de CONSISTÊNCIA DO WORLDBUILDING cobrindo cada dimensão e suas interdependências:
+
+## 1. GEOGRAFIA E COSMOLOGIA
+O espaço físico do mundo: mapas, distâncias, clima, recursos naturais. Há contradições geográficas? A cosmologia sustenta a narrativa?
+
+## 2. SISTEMA POLÍTICO E PODER
+Estruturas de governo, hierarquias, facções, alianças. São coerentes com a história e cultura do mundo? O poder muda de mãos de forma lógica?
+
+## 3. HISTÓRIA E CRONOLOGIA
+Eventos passados que moldaram o presente. Há anacronismos? A linha temporal é coerente? Causa e consequência fazem sentido?
+
+## 4. CULTURA E SOCIEDADE
+Costumes, valores, rituais, classes sociais. A cultura é internamente consistente? Diferentes povos têm identidades distintas e coerentes?
+
+## 5. SISTEMA DE MAGIA / TECNOLOGIA
+Regras, custos, limitações. O sistema tem regras claras? Há deus ex machina? O poder escala de forma lógica?
+
+## 6. ECONOMIA E RECURSOS
+Comércio, moeda, escassez, abundância. A economia sustenta as ações dos personagens? Guerras e conflitos têm base econômica crível?
+
+## 7. LÍNGUA E COMUNICAÇÃO
+Idiomas, dialetos, barreiras linguísticas. Se há línguas inventadas, são consistentes? A comunicação entre povos é plausível?
+
+## 8. MITOLOGIA E RELIGIÃO
+Crenças, deuses, profecias. A religião influencia a política e cultura de forma coerente? Profecias são integradas ou convenientes?
+
+## 9. SERES E ESPÉCIES
+Biologia, ecologia, relações entre espécies. São ecologicamente plausíveis? Suas sociedades são consistentes com suas naturezas?
+
+## 10. MAPA DE CONTRADIÇÕES
+Lista todas as contradições, inconsistências ou impossibilidades encontradas entre as dimensões. Para cada uma, indique a severidade (CRÍTICA / MENOR / COSMÉTICA) e sugira resolução.
+
+## 11. NOTA DE COERÊNCIA GERAL
+Avaliação final: o universo se sustenta? Onde é mais forte? Onde é mais frágil? O que precisa ser resolvido antes de tudo?
+
+Tom: analítico, preciso, construtivo. Trate o universo como algo real a ser auditado.`;
+
+      const worldReport = await callClaude(worldPrompt, claudeKey, 3500);
+      document.getElementById('world-thinking').style.display='none';
+      document.getElementById('world-title').textContent=`Consistência do Worldbuilding · ${projName}`;
+      const wb=document.getElementById('world-body'); wb.style.display='block'; wb.textContent=worldReport;
+      reports.world = worldReport;
+
+      document.getElementById('world-status').textContent='✓ Gerado';
+      document.getElementById('world-status').className='rc-status';
+      document.getElementById('dl-world').style.display='inline-flex';
+
+      await uploadHtml(worldReport, 'consistencia-worldbuilding.txt', slug, 'SFBS: consistência do worldbuilding');
+      log('✓ Consistência do worldbuilding gerada e salva', 'ok');
+    } catch(e) { log(`✗ Worldbuilding: ${e.message}`, 'err'); }
+
     setProgress(100);
     document.getElementById('sn5').className='step-num done'; document.getElementById('sn5').textContent='✓';
-    log('✓✓ Onboarding completo!', 'ok');
+    log('✓✓ Onboarding completo — 3 relatórios gerados!', 'ok');
     btn.innerHTML='<span class="generate-btn-icon">✓</span> Onboarding Completo';
 
   } catch(e) {
