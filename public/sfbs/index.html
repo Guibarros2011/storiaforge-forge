@@ -469,15 +469,125 @@ let uploadedFiles = [];
 let generatedEmailHtml = '';
 const reports = { diag: '', editorial: '', world: '' };
 
-function downloadReport(type) {
-  const names = { diag: 'Diagnostico-SFBS', editorial: 'Analise-Editorial', world: 'Consistencia-Worldbuilding' };
+// ── DOCX ENGINE ────────────────────────────────────────
+function dEsc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function dP(text, opts={}) {
+  const {bold,italic,color,sz,font,align,after=80,before=0,indent,hanging,border}=opts;
+  let rpr='';
+  if(bold) rpr+='<w:b/>';
+  if(italic) rpr+='<w:i/>';
+  if(color) rpr+=`<w:color w:val="${color}"/>`;
+  if(sz) rpr+=`<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>`;
+  if(font) rpr+=`<w:rFonts w:ascii="${font}" w:hAnsi="${font}"/>`;
+  let ppr=`<w:spacing w:before="${before}" w:after="${after}"/>`;
+  if(align) ppr+=`<w:jc w:val="${align}"/>`;
+  if(indent) ppr+=`<w:ind w:left="${indent}"${hanging?` w:hanging="${hanging}"`:''}/>`;
+  if(border) ppr+=border;
+  return `<w:p><w:pPr>${ppr}</w:pPr><w:r>${rpr?`<w:rPr>${rpr}</w:rPr>`:''}<w:t xml:space="preserve">${dEsc(text)}</w:t></w:r></w:p>`;
+}
+function dH2(text) {
+  return `<w:p><w:pPr><w:spacing w:before="360" w:after="120"/><w:pBdr><w:bottom w:val="single" w:sz="2" w:space="1" w:color="b08830"/></w:pBdr></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/><w:szCs w:val="28"/><w:color w:val="16303f"/><w:rFonts w:ascii="Cormorant Garamond" w:hAnsi="Cormorant Garamond"/></w:rPr><w:t>${dEsc(text)}</w:t></w:r></w:p>`;
+}
+function dH3(text) {
+  return `<w:p><w:pPr><w:spacing w:before="200" w:after="80"/></w:pPr><w:r><w:rPr><w:b/><w:i/><w:sz w:val="24"/><w:szCs w:val="24"/><w:color w:val="2a4a5e"/><w:rFonts w:ascii="Cormorant Garamond" w:hAnsi="Cormorant Garamond"/></w:rPr><w:t>${dEsc(text)}</w:t></w:r></w:p>`;
+}
+function dBody(text) {
+  return `<w:p><w:pPr><w:spacing w:after="100"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:rFonts w:ascii="EB Garamond" w:hAnsi="EB Garamond"/></w:rPr><w:t xml:space="preserve">${dEsc(text)}</w:t></w:r></w:p>`;
+}
+function dBullet(text) {
+  return `<w:p><w:pPr><w:ind w:left="400" w:hanging="200"/><w:spacing w:after="60"/></w:pPr><w:r><w:rPr><w:color w:val="b08830"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">⚓  </w:t></w:r><w:r><w:rPr><w:sz w:val="22"/><w:rFonts w:ascii="EB Garamond" w:hAnsi="EB Garamond"/></w:rPr><w:t xml:space="preserve">${dEsc(text)}</w:t></w:r></w:p>`;
+}
+function dBoldLabel(label, value) {
+  return `<w:p><w:pPr><w:spacing w:after="80"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="22"/><w:color w:val="16303f"/><w:rFonts w:ascii="Cormorant Garamond" w:hAnsi="Cormorant Garamond"/></w:rPr><w:t xml:space="preserve">${dEsc(label)}</w:t></w:r><w:r><w:rPr><w:sz w:val="22"/><w:rFonts w:ascii="EB Garamond" w:hAnsi="EB Garamond"/></w:rPr><w:t xml:space="preserve">${dEsc(value)}</w:t></w:r></w:p>`;
+}
+function dSpacer() { return `<w:p><w:pPr><w:spacing w:after="140"/></w:pPr><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>`; }
+function dBorder(color,side,sz,after) {
+  return `<w:p><w:pPr><w:pBdr><w:${side} w:val="single" w:sz="${sz}" w:space="1" w:color="${color}"/></w:pBdr><w:spacing w:after="${after}"/></w:pPr><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>`;
+}
+function dStyles() {
+  return `<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="EB Garamond" w:hAnsi="EB Garamond"/><w:sz w:val="22"/></w:rPr></w:style></w:styles>`;
+}
+
+function markdownToDocxParas(text) {
+  const paras = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^##\s+/.test(trimmed)) { paras.push(dH2(trimmed.replace(/^##\s+/,''))); continue; }
+    if (/^###\s+/.test(trimmed)) { paras.push(dH3(trimmed.replace(/^###\s+/,''))); continue; }
+    if (/^#\s+/.test(trimmed)) { paras.push(dH2(trimmed.replace(/^#\s+/,''))); continue; }
+    if (/^[-*•✅⚠️❌]/.test(trimmed)) {
+      const clean = trimmed.replace(/^[-*•]\s*/,'').replace(/\*\*/g,'').trim();
+      paras.push(dBullet(clean)); continue;
+    }
+    const boldMatch = trimmed.match(/^\*\*([^*]+)\*\*[:]?\s*(.*)/);
+    if (boldMatch) { paras.push(dBoldLabel(boldMatch[1]+(boldMatch[2]?': ':''), boldMatch[2]||'')); continue; }
+    paras.push(dBody(trimmed.replace(/\*\*/g,'').replace(/\*/g,'')));
+  }
+  return paras;
+}
+
+function buildReportDocx(title, subtitle, accentColor, content, projName) {
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const paras = [];
+
+  // Capa
+  paras.push(dP('',{after:60}));
+  paras.push(dP('STORIAFORGE',{bold:true,color:'b08830',sz:36,font:'Cormorant Garamond',align:'center',after:20}));
+  paras.push(dP(title,{bold:true,color:accentColor,sz:44,font:'Cormorant Garamond',align:'center',after:10}));
+  paras.push(dP(subtitle,{italic:true,color:'8a6a28',sz:22,font:'Cormorant Garamond',align:'center',after:80}));
+  paras.push(dBorder('b08830','bottom',4,60));
+  paras.push(dP(projName,{bold:true,color:'16303f',sz:36,font:'Cormorant Garamond',align:'center',after:20}));
+  paras.push(dP(hoje,{italic:true,sz:18,color:'8a6a28',align:'center',after:120}));
+  paras.push(dBorder('b08830','bottom',2,320));
+
+  // Conteúdo
+  paras.push(...markdownToDocxParas(content));
+  paras.push(dSpacer());
+
+  // Rodapé
+  paras.push(dBorder('b08830','top',4,60));
+  paras.push(dP('Vilhelmo de Bahxos · FishJourney · StoriaForge',{italic:true,sz:18,color:'8a6a28',align:'center',after:40}));
+  paras.push(dP('⚓ StoryForge Building System ⚓',{sz:18,color:'b08830',align:'center',after:80}));
+
+  const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>${paras.join('')}
+<w:sectPr>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+</w:sectPr>
+</w:body>
+</w:document>`;
+
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file('word/document.xml', docXml);
+  zip.file('word/styles.xml', dStyles());
+  zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  return zip;
+}
+
+async function downloadReport(type) {
+  const meta = {
+    diag:      { title:'Diagnóstico SFBS', subtitle:'Análise inicial do projeto', color:'b08830', file:'Diagnostico-SFBS' },
+    editorial: { title:'Análise Editorial', subtitle:'Avaliação editorial completa', color:'16303f', file:'Analise-Editorial' },
+    world:     { title:'Consistência do Worldbuilding', subtitle:'Auditoria do universo ficcional', color:'2a4a5e', file:'Consistencia-Worldbuilding' },
+  };
+  const m = meta[type];
   const content = reports[type];
-  if (!content) return;
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  if (!content || !m) return;
+
+  const projName = document.getElementById('proj-name').value.trim() || 'Projeto';
+  const zip = buildReportDocx(m.title, m.subtitle, m.color, content, projName);
+  const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${names[type]}.txt`;
+  a.download = `${m.file}_${projName.replace(/[^a-zA-Z0-9]/g,'_')}.docx`;
   a.click();
   URL.revokeObjectURL(url);
 }
