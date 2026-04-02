@@ -261,31 +261,21 @@ body::before{content:'';position:fixed;inset:0;
     </div>
   </div>
 
-  <!-- CARD 1 — CREDENCIAIS -->
+  <!-- CARD 1 — CREDENCIAIS (gerenciadas pelo Worker) -->
   <div class="card active-card" id="card1">
     <div class="card-header">
-      <div class="card-num">1</div>
+      <div class="card-num" style="background:rgba(45,212,191,.1);border-color:var(--green);color:var(--green);">✓</div>
       <div>
         <div class="card-title">Credenciais</div>
-        <div class="card-sub">Necessárias para criar o repositório e gerar o diagnóstico</div>
-      </div>
-    </div>
-    <div class="cred-grid">
-      <div class="cred-item">
-        <label class="field-label">GitHub Token <span class="req">*</span></label>
-        <input class="cred-input" type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" oninput="checkCreds()">
-        <div class="field-hint"><a href="https://github.com/settings/tokens" target="_blank" style="color:var(--ice);">Gerar token →</a> &nbsp; Permissão: repo</div>
-      </div>
-      <div class="cred-item">
-        <label class="field-label">Anthropic API Key <span class="req">*</span></label>
-        <input class="cred-input" type="password" id="claude-key" placeholder="sk-ant-xxxxxxxxxxxxxxxxxxxx" oninput="checkCreds()">
-        <div class="field-hint"><a href="https://console.anthropic.com" target="_blank" style="color:var(--ice);">console.anthropic.com →</a></div>
+        <div class="card-sub">Gerenciadas automaticamente pelo servidor</div>
       </div>
     </div>
     <div class="cred-status" id="cred-status">
-      <div class="cred-dot" id="cred-dot"></div>
-      <span id="cred-text" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);">Aguardando credenciais</span>
+      <div class="cred-dot ok" id="cred-dot"></div>
+      <span id="cred-text" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);">✓ Credenciais configuradas no Worker</span>
     </div>
+    <input type="hidden" id="gh-token" value="worker-managed">
+    <input type="hidden" id="claude-key" value="worker-managed">
   </div>
 
   <!-- CARD 2 — CLIENTE -->
@@ -476,29 +466,20 @@ function updateRepoSlug() {
 }
 
 function checkCreds() {
-  const token = document.getElementById('gh-token').value.trim();
-  const key   = document.getElementById('claude-key').value.trim();
-  const dot   = document.getElementById('cred-dot');
-  const text  = document.getElementById('cred-text');
-  const sn1   = document.getElementById('sn1');
-  if (token && key) {
-    dot.className='cred-dot ok'; text.textContent='✓ Credenciais configuradas'; text.style.color='var(--green)';
-    sn1.className='step-num done'; sn1.textContent='✓';
-  } else {
-    dot.className='cred-dot'; text.textContent='Aguardando credenciais'; text.style.color='var(--muted)';
-    sn1.className='step-num active'; sn1.textContent='1';
-  }
+  // Credenciais gerenciadas pelo Worker — sempre OK
+  const sn1 = document.getElementById('sn1');
+  sn1.className='step-num done'; sn1.textContent='✓';
   checkGenBtn();
 }
+// Inicializar step 1 como done
+document.addEventListener('DOMContentLoaded', checkCreds);
 
 function checkGenBtn() {
-  const token   = document.getElementById('gh-token').value.trim();
-  const key     = document.getElementById('claude-key').value.trim();
   const name    = document.getElementById('client-name').value.trim();
   const ctx     = document.getElementById('client-context').value.trim();
   const proj    = document.getElementById('proj-name').value.trim();
   const premise = document.getElementById('proj-premise').value.trim();
-  document.getElementById('gen-btn').disabled = !(token && key && name && ctx && proj && premise);
+  document.getElementById('gen-btn').disabled = !(name && ctx && proj && premise);
 }
 
 // ── FILES ──────────────────────────────────────────────
