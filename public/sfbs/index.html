@@ -676,13 +676,23 @@ async function readFolderEntries(entries, base) {
 }
 
 function addFiles(newFiles) {
-  for (const f of newFiles)
+  for (const f of newFiles) {
+    if (shouldSkip(f)) continue;
     if (!uploadedFiles.find(x => x.name===f.name && x.size===f.size)) uploadedFiles.push(f);
+  }
   renderChips();
+}
+
+const MAX_FILE_MB = 20;
+function shouldSkip(f) {
+  if (f.name === '.DS_Store' || f.name.startsWith('._')) return true;
+  if (f.size > MAX_FILE_MB * 1024 * 1024) { log(`⚠ ${f.name} ignorado — acima de ${MAX_FILE_MB}MB`, 'warn'); return true; }
+  return false;
 }
 
 function handleFiles(newFiles) {
   for (const f of newFiles) {
+    if (shouldSkip(f)) continue;
     if (!uploadedFiles.find(x => x.name===f.name && x.size===f.size)) {
       if (!f._path) f._path = f.webkitRelativePath || f.name;
       uploadedFiles.push(f);
@@ -781,7 +791,7 @@ async function uploadFile(file, slug) {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ filename: file.name, filepath, content_b64: b64, repo_slug: slug })
   });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
 }
 
 async function uploadHtml(content, filename, slug, commitMsg) {
@@ -789,7 +799,7 @@ async function uploadHtml(content, filename, slug, commitMsg) {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ content, filename, repo_slug: slug, commit_msg: commitMsg })
   });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
 }
 
 // enablePages — feito pelo Worker no /create-repo
@@ -801,7 +811,7 @@ async function callClaude(prompt, _key, maxTokens=2500) {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ files_content: prompt, repo_slug: 'sfbs-internal' })
   });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
   return (await res.json()).report;
 }
 
