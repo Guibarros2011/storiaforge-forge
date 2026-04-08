@@ -350,13 +350,16 @@ body::before{content:'';position:fixed;inset:0;
       </div>
     </div>
     <div class="drop-zone" id="drop-zone"
-         ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-         onclick="document.getElementById('file-input-agent').click()">
+         ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
       <span class="drop-icon">📂</span>
-      <div class="drop-title">Arraste arquivos do projeto aqui</div>
-      <div class="drop-sub">Capítulos, GDDs, fichas, referências, imagens<br>Qualquer formato — .docx .pdf .txt .md .png .jpg</div>
-      <button class="drop-btn" onclick="event.stopPropagation();document.getElementById('file-input-agent').click()">📎 &nbsp; Selecionar Arquivos</button>
+      <div class="drop-title">Arraste arquivos ou pastas aqui</div>
+      <div class="drop-sub">A estrutura de pastas será espelhada no repositório<br>Qualquer formato — .docx .pdf .txt .md .png .jpg</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;">
+        <button class="drop-btn" onclick="event.stopPropagation();document.getElementById('file-input-agent').click()">📎 &nbsp; Arquivos</button>
+        <button class="drop-btn" onclick="event.stopPropagation();document.getElementById('folder-input-agent').click()">📁 &nbsp; Pasta</button>
+      </div>
       <input type="file" id="file-input-agent" multiple style="display:none" onchange="handleFiles(this.files)">
+      <input type="file" id="folder-input-agent" multiple webkitdirectory style="display:none" onchange="handleFiles(this.files)">
     </div>
     <div class="file-chips" id="file-chips"></div>
   </div>
@@ -642,11 +645,49 @@ function checkGenBtn() {
 // ── FILES ──────────────────────────────────────────────
 function handleDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
 function handleDragLeave() { document.getElementById('drop-zone').classList.remove('over'); }
-function handleDrop(e)    { e.preventDefault(); document.getElementById('drop-zone').classList.remove('over'); handleFiles(e.dataTransfer.files); }
 
-function handleFiles(newFiles) {
+async function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  const items = e.dataTransfer.items;
+  if (items && items.length) {
+    const entries = Array.from(items).map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (entries.length) { const files = await readFolderEntries(entries, ''); addFiles(files); return; }
+  }
+  handleFiles(e.dataTransfer.files);
+}
+
+async function readFolderEntries(entries, base) {
+  const files = [];
+  for (const entry of entries) {
+    if (entry.isFile) {
+      const f = await new Promise(r => entry.file(r));
+      f._path = base ? base + '/' + entry.name : entry.name;
+      files.push(f);
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let batch;
+      const sub = [];
+      do { batch = await new Promise(r => reader.readEntries(r)); sub.push(...batch); } while (batch.length);
+      files.push(...await readFolderEntries(sub, base ? base + '/' + entry.name : entry.name));
+    }
+  }
+  return files;
+}
+
+function addFiles(newFiles) {
   for (const f of newFiles)
     if (!uploadedFiles.find(x => x.name===f.name && x.size===f.size)) uploadedFiles.push(f);
+  renderChips();
+}
+
+function handleFiles(newFiles) {
+  for (const f of newFiles) {
+    if (!uploadedFiles.find(x => x.name===f.name && x.size===f.size)) {
+      if (!f._path) f._path = f.webkitRelativePath || f.name;
+      uploadedFiles.push(f);
+    }
+  }
   renderChips();
 }
 
@@ -663,8 +704,9 @@ function renderChips() {
   const el = document.getElementById('file-chips');
   el.innerHTML = '';
   uploadedFiles.forEach((f,i) => {
+    const path = f._path || f.name;
     const d = document.createElement('div'); d.className='file-chip';
-    d.innerHTML=`<span class="chip-icon">${fileIcon(f.name)}</span><span class="chip-name">${f.name}</span><span class="chip-size">${fmtSize(f.size)}</span><button class="chip-rm" onclick="removeFile(${i})">×</button>`;
+    d.innerHTML=`<span class="chip-icon">${fileIcon(f.name)}</span><span class="chip-name" title="${path}">${path}</span><span class="chip-size">${fmtSize(f.size)}</span><button class="chip-rm" onclick="removeFile(${i})">×</button>`;
     el.appendChild(d);
   });
 }
@@ -734,9 +776,10 @@ async function uploadFile(file, slug) {
     r.onload = e => resolve(e.target.result.split(',')[1]);
     r.readAsDataURL(file);
   });
+  const filepath = file._path || file.name;
   const res = await fetch(`${WORKER_URL}/upload`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ filename: file.name, content_b64: b64, repo_slug: slug })
+    body: JSON.stringify({ filename: file.name, filepath, content_b64: b64, repo_slug: slug })
   });
   if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
 }
@@ -893,12 +936,16 @@ footer{background:rgba(15,37,53,.95);border-top:1px solid var(--gold-border);pad
 
 
 
-  <div class="uz" id="uz" ondrop="pDrop(event)" ondragover="pDragO(event)" ondragleave="pDragL(event)" onclick="document.getElementById('pfi').click()">
+  <div class="uz" id="uz" ondrop="pDrop(event)" ondragover="pDragO(event)" ondragleave="pDragL(event)">
     <span class="uz-icon">📂</span>
-    <div class="uz-title">Arraste os arquivos aqui</div>
-    <p class="uz-sub">Documentos, imagens, textos, referências —<br>tudo que existe sobre o ${projectName}.</p>
-    <button class="uz-btn" onclick="event.stopPropagation();document.getElementById('pfi').click()">📎 Selecionar Arquivos</button>
+    <div class="uz-title">Arraste arquivos ou pastas aqui</div>
+    <p class="uz-sub">A estrutura de pastas será espelhada no repositório —<br>tudo que existe sobre o ${projectName}.</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;">
+      <button class="uz-btn" onclick="event.stopPropagation();document.getElementById('pfi').click()">📎 Arquivos</button>
+      <button class="uz-btn" onclick="event.stopPropagation();document.getElementById('pfolder').click()">📁 Pasta</button>
+    </div>
     <input type="file" id="pfi" multiple style="display:none" onchange="pFiles(this.files)">
+    <input type="file" id="pfolder" multiple webkitdirectory style="display:none" onchange="pFiles(this.files)">
   </div>
   <div class="fl" id="fl"></div>
   <div class="pb" id="pb"><div class="pf" id="pf"></div></div>
@@ -928,13 +975,15 @@ function toggleCfg(){const b=document.getElementById('cfg-body');const i=documen
 function updBtn(){document.getElementById('sub-btn').disabled=!(pf2.length>0);}
 function pDragO(e){e.preventDefault();document.getElementById('uz').classList.add('over');}
 function pDragL(){document.getElementById('uz').classList.remove('over');}
-function pDrop(e){e.preventDefault();document.getElementById('uz').classList.remove('over');pFiles(e.dataTransfer.files);}
-function pFiles(fs){for(const f of fs)if(!pf2.find(x=>x.name===f.name&&x.size===f.size))pf2.push(f);renderFL();updBtn();}
+async function pDrop(e){e.preventDefault();document.getElementById('uz').classList.remove('over');const its=e.dataTransfer.items;if(its&&its.length){const ens=Array.from(its).map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);if(ens.length){const fs=await pReadEntries(ens,'');pAddFiles(fs);return;}}pFiles(e.dataTransfer.files);}
+async function pReadEntries(entries,base){const files=[];for(const e of entries){if(e.isFile){const f=await new Promise(r=>e.file(r));f._path=base?base+'/'+e.name:e.name;files.push(f);}else if(e.isDirectory){const rd=e.createReader();let bt;const sub=[];do{bt=await new Promise(r=>rd.readEntries(r));sub.push(...bt);}while(bt.length);files.push(...await pReadEntries(sub,base?base+'/'+e.name:e.name));}}return files;}
+function pAddFiles(fs){for(const f of fs)if(!pf2.find(x=>x.name===f.name&&x.size===f.size))pf2.push(f);renderFL();updBtn();}
+function pFiles(fs){for(const f of fs){if(!pf2.find(x=>x.name===f.name&&x.size===f.size)){if(!f._path)f._path=f.webkitRelativePath||f.name;pf2.push(f);}}renderFL();updBtn();}
 function rmF(i){pf2.splice(i,1);renderFL();updBtn();}
 function fi2(n){const e=n.split('.').pop().toLowerCase();return {pdf:'📄',docx:'📝',doc:'📝',txt:'📃',md:'📃',png:'🖼️',jpg:'🖼️',jpeg:'🖼️'}[e]||'📎';}
 function fmtS(b){return b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';}
 function ghFld(n){const e=n.split('.').pop().toLowerCase();return ['docx','doc','pdf','txt','md'].includes(e)?'documentos':['png','jpg','jpeg','gif','webp'].includes(e)?'imagens':'outros';}
-function renderFL(){const el=document.getElementById('fl');el.innerHTML='';pf2.forEach((f,i)=>{const d=document.createElement('div');d.className='fi';d.id='fi'+i;d.innerHTML='<span class="fi-icon">'+fi2(f.name)+'</span><span class="fi-name">'+f.name+'</span><span class="fi-st pending" id="fs'+i+'">pendente</span><button class="fi-rm" onclick="rmF('+i+')">×</button>';el.appendChild(d);});}
+function renderFL(){const el=document.getElementById('fl');el.innerHTML='';pf2.forEach((f,i)=>{const p=f._path||f.name;const d=document.createElement('div');d.className='fi';d.id='fi'+i;d.innerHTML='<span class="fi-icon">'+fi2(f.name)+'</span><span class="fi-name" title="'+p+'">'+p+'</span><span class="fi-st pending" id="fs'+i+'">pendente</span><button class="fi-rm" onclick="rmF('+i+')">×</button>';el.appendChild(d);});}
 function plog(m,t='i'){const el=document.getElementById('slog');el.style.display='block';const ts=new Date().toTimeString().slice(0,8);const d=document.createElement('div');d.className='ll';d.innerHTML='<span class="lt0">'+ts+'</span><span class="l'+t+'">'+m+'</span>';el.appendChild(d);el.scrollTop=el.scrollHeight;}
 async function exTxt(file){return new Promise(r=>{const ext=file.name.split('.').pop().toLowerCase();if(['txt','md'].includes(ext)){const rd=new FileReader();rd.onload=e=>r({name:file.name,text:e.target.result.slice(0,10000)});rd.readAsText(file);return;}if(['docx','doc'].includes(ext)){const rd=new FileReader();rd.onload=async e=>{try{const zip=await JSZip.loadAsync(e.target.result);const xml=await zip.file('word/document.xml').async('string');const tx=xml.replace(/<w:p[ >/]/g,'\\n').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/[ \\t]+/g,' ').replace(/\\n\\s*\\n\\s*\\n/g,'\\n\\n').trim().slice(0,10000);r({name:file.name,text:tx});}catch(e){r({name:file.name,text:'[Erro:'+e.message+']'});}};rd.readAsArrayBuffer(file);return;}r({name:file.name,text:'['+file.name+']'});});}
 async function ghPut(path,content,token,msg){const b64=btoa(unescape(encodeURIComponent(content)));let sha=null;try{const res=await fetch('https://api.github.com/repos/'+GH_O+'/'+GH_R+'/contents/'+path,{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});if(res.ok)sha=(await res.json()).sha;}catch(_){}const body={message:msg,content:b64,branch:GH_B};if(sha)body.sha=sha;const res=await fetch('https://api.github.com/repos/'+GH_O+'/'+GH_R+'/contents/'+path,{method:'PUT',headers:{'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},body:JSON.stringify(body)});if(!res.ok){const e=await res.json();throw new Error(e.message);}}
@@ -953,7 +1002,7 @@ async function pUpload(){
     plog('Enviando '+f.name,'i');
     try{
       const b64=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.readAsDataURL(f);});
-      const resp=await fetch(WORKER+'/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,content_b64:b64,repo_slug:GH_R})});
+      const fp=f._path||f.name;const resp=await fetch(WORKER+'/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,filepath:fp,content_b64:b64,repo_slug:GH_R})});
       if(!resp.ok){const e=await resp.json();throw new Error(e.error||'HTTP '+resp.status);}
       document.getElementById('fs'+i).textContent='✓';document.getElementById('fs'+i).className='fi-st done';document.getElementById('fi'+i).className='fi done';plog('✓ '+f.name,'k');names.push(f.name);ok++;
     }catch(e){document.getElementById('fs'+i).textContent='✗';document.getElementById('fs'+i).className='fi-st error';document.getElementById('fi'+i).className='fi error';plog('✗ '+f.name+': '+e.message,'e');err++;}
