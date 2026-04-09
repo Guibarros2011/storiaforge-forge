@@ -713,6 +713,15 @@ function ghFolder(n){ const e=n.split('.').pop().toLowerCase(); return ['docx','
 function renderChips() {
   const el = document.getElementById('file-chips');
   el.innerHTML = '';
+  if (uploadedFiles.length > 1) {
+    const allFlat = uploadedFiles.every(f => (f._path || f.name) === f.name);
+    if (allFlat) {
+      const w = document.createElement('div');
+      w.style.cssText = 'background:rgba(176,136,48,.07);border:1px solid rgba(176,136,48,.3);border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#c9a84c;font-family:JetBrains Mono,monospace;line-height:1.6;';
+      w.innerHTML = '⚠ Nenhuma estrutura de pastas detectada — todos os arquivos irão para a raiz do repositório.<br><small style="color:#7a6f60">Para preservar subpastas, remova os arquivos e use o botão <strong>📁 Pasta</strong> selecionando a pasta raiz do projeto.</small>';
+      el.appendChild(w);
+    }
+  }
   uploadedFiles.forEach((f,i) => {
     const path = f._path || f.name;
     const d = document.createElement('div'); d.className='file-chip';
