@@ -683,7 +683,7 @@ function addFiles(newFiles) {
   renderChips();
 }
 
-const MAX_FILE_MB = 20;
+const MAX_FILE_MB = 50;
 function shouldSkip(f) {
   if (f.name === '.DS_Store' || f.name.startsWith('._')) return true;
   if (f.size > MAX_FILE_MB * 1024 * 1024) { log(`⚠ ${f.name} ignorado — acima de ${MAX_FILE_MB}MB`, 'warn'); return true; }
@@ -987,12 +987,13 @@ function pDragO(e){e.preventDefault();document.getElementById('uz').classList.ad
 function pDragL(){document.getElementById('uz').classList.remove('over');}
 async function pDrop(e){e.preventDefault();document.getElementById('uz').classList.remove('over');const its=e.dataTransfer.items;if(its&&its.length){const ens=Array.from(its).map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);if(ens.length){const fs=await pReadEntries(ens,'');pAddFiles(fs);return;}}pFiles(e.dataTransfer.files);}
 async function pReadEntries(entries,base){const files=[];for(const e of entries){if(e.isFile){const f=await new Promise(r=>e.file(r));f._path=base?base+'/'+e.name:e.name;files.push(f);}else if(e.isDirectory){const rd=e.createReader();let bt;const sub=[];do{bt=await new Promise(r=>rd.readEntries(r));sub.push(...bt);}while(bt.length);files.push(...await pReadEntries(sub,base?base+'/'+e.name:e.name));}}return files;}
-function pAddFiles(fs){for(const f of fs)if(!pf2.find(x=>x.name===f.name&&x.size===f.size))pf2.push(f);renderFL();updBtn();}
-function pFiles(fs){for(const f of fs){if(!pf2.find(x=>x.name===f.name&&x.size===f.size)){if(!f._path)f._path=f.webkitRelativePath||f.name;pf2.push(f);}}renderFL();updBtn();}
+function pAddFiles(fs){const sk=[];for(const f of fs){if(f.name==='.DS_Store'||f.name.startsWith('._'))continue;if(f.size>MAX_FILE_MB*1024*1024){sk.push(f.name+' ('+fmtS(f.size)+')');continue;}if(!pf2.find(x=>x.name===f.name&&x.size===f.size))pf2.push(f);}if(sk.length)showSkipped(sk);renderFL();updBtn();}
+function pFiles(fs){const sk=[];for(const f of fs){if(f.name==='.DS_Store'||f.name.startsWith('._'))continue;if(f.size>MAX_FILE_MB*1024*1024){sk.push(f.name+' ('+fmtS(f.size)+')');continue;}if(!pf2.find(x=>x.name===f.name&&x.size===f.size)){if(!f._path)f._path=f.webkitRelativePath||f.name;pf2.push(f);}}if(sk.length)showSkipped(sk);renderFL();updBtn();}
 function rmF(i){pf2.splice(i,1);renderFL();updBtn();}
 function fi2(n){const e=n.split('.').pop().toLowerCase();return {pdf:'📄',docx:'📝',doc:'📝',txt:'📃',md:'📃',png:'🖼️',jpg:'🖼️',jpeg:'🖼️'}[e]||'📎';}
 function fmtS(b){return b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';}
 function ghFld(n){const e=n.split('.').pop().toLowerCase();return ['docx','doc','pdf','txt','md'].includes(e)?'documentos':['png','jpg','jpeg','gif','webp'].includes(e)?'imagens':'outros';}
+function showSkipped(names){let el=document.getElementById('skipped-warn');if(!el){el=document.createElement('div');el.id='skipped-warn';el.style.cssText='background:rgba(176,136,48,.07);border:1px solid rgba(176,136,48,.3);border-radius:6px;padding:12px 16px;margin-top:10px;font-size:11px;color:#c9a84c;font-family:JetBrains Mono,monospace;line-height:1.7;';document.getElementById('fl').after(el);}el.innerHTML='<strong>⚠ '+names.length+' arquivo(s) ignorado(s) — acima de '+MAX_FILE_MB+'MB</strong><br>'+names.map(n=>'· '+n).join('<br>')+'<br><small style="color:#7a6f60;margin-top:4px;display:block">Arquivos grandes devem ser enviados separadamente.</small>';}
 function renderFL(){const el=document.getElementById('fl');el.innerHTML='';pf2.forEach((f,i)=>{const p=f._path||f.name;const d=document.createElement('div');d.className='fi';d.id='fi'+i;d.innerHTML='<span class="fi-icon">'+fi2(f.name)+'</span><span class="fi-name" title="'+p+'">'+p+'</span><span class="fi-st pending" id="fs'+i+'">pendente</span><button class="fi-rm" onclick="rmF('+i+')">×</button>';el.appendChild(d);});}
 function plog(m,t='i'){const el=document.getElementById('slog');el.style.display='block';const ts=new Date().toTimeString().slice(0,8);const d=document.createElement('div');d.className='ll';d.innerHTML='<span class="lt0">'+ts+'</span><span class="l'+t+'">'+m+'</span>';el.appendChild(d);el.scrollTop=el.scrollHeight;}
 async function exTxt(file){return new Promise(r=>{const ext=file.name.split('.').pop().toLowerCase();if(['txt','md'].includes(ext)){const rd=new FileReader();rd.onload=e=>r({name:file.name,text:e.target.result.slice(0,10000)});rd.readAsText(file);return;}if(['docx','doc'].includes(ext)){const rd=new FileReader();rd.onload=async e=>{try{const zip=await JSZip.loadAsync(e.target.result);const xml=await zip.file('word/document.xml').async('string');const tx=xml.replace(/<w:p[ >/]/g,'\\n').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/[ \\t]+/g,' ').replace(/\\n\\s*\\n\\s*\\n/g,'\\n\\n').trim().slice(0,10000);r({name:file.name,text:tx});}catch(e){r({name:file.name,text:'[Erro:'+e.message+']'});}};rd.readAsArrayBuffer(file);return;}r({name:file.name,text:'['+file.name+']'});});}
